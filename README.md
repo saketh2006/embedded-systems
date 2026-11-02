@@ -125,7 +125,65 @@ Open `http://127.0.0.1:8085` in Google Chrome or Microsoft Edge.
 
 ---
 
-## 8. Testing Plan
+## 8. How to Run the Code (Step-by-Step Guide)
+
+### Part 1: Hardware Connections
+1. Connect the **ST-LINK V2** programmer to the STM32F401CCU6 Black Pill:
+   - `SWDIO` &rarr; `SWDIO` (PA13)
+   - `SWCLK` &rarr; `SWCLK` (PA14)
+   - `GND` &rarr; `GND`
+   - `3.3V` &rarr; `3.3V`
+2. Wire all peripheral components as per the **Hardware Pin Mapping** table:
+   - **ADXL345 & 16×2 LCD:** SCL to `PB8`, SDA to `PB9`, VCC to `3.3V`, GND to `GND`.
+   - **Potentiometer:** Wiper to `PA0`, outer legs to `3.3V` and `GND`.
+   - **Push Button:** One pin to `PA1`, the other pin to `GND`.
+   - **HC-05 Bluetooth:** TXD to `PA3`, RXD to `PA2`, VCC to `5V`/`3.3V`, GND to `GND`.
+   - **SG90 Servo:** Signal wire to `PA6`. **Connect Red (VCC) and Brown/Black (GND) to an external regulated 5V 2A power supply, with a common ground joined to the STM32 GND.**
+
+---
+
+### Part 2: Compiling & Flashing the Firmware
+
+#### Option A: Using Keil MDK-ARM (Recommended)
+1. Open Keil uVision and create a new project targeting device **STM32F401CCUx**.
+2. In the **Manage Run-Time Environment** dialog, check:
+   - `CMSIS` &rarr; `CORE`
+   - `Device` &rarr; `Startup`
+3. Add `main.c` (or `src/main.c`) into your project source group.
+4. Open **Project Options (Alt + F7)**:
+   - **Target Tab:** Set IROM1 to `0x08000000` (Size: `0x40000`), IRAM1 to `0x20000000` (Size: `0x10000`).
+   - **Debug Tab:** Choose **ST-Link Debugger**, open *Settings*, and confirm SWD detects the Cortex-M4 core.
+   - **Utilities Tab:** Enable *Use Target Driver for Flash Programming*.
+5. Click **Build (F7)** to compile the code (verifying 0 Errors, 0 Warnings).
+6. Click **Download (F8)** to flash the binary to the board.
+7. Press the **NRST** hardware button on the Black Pill board to reset and start firmware execution.
+
+#### Option B: Using STM32CubeIDE
+1. Create a new **STM32 Project** selecting MCU **STM32F401CCU6**.
+2. Copy `main.c` into the `Core/Src/` folder.
+3. Build the project (**Project &rarr; Build Project**).
+4. Connect ST-LINK V2 and click **Run &rarr; Run As &rarr; STM32 Cortex-M C/C++ Application**.
+
+---
+
+### Part 3: Running the Web App & Bluetooth Control Center
+1. **Pair HC-05 with Computer:**
+   - In Windows, go to **Settings &rarr; Bluetooth & devices &rarr; Add device**.
+   - Select **HC-05** and pair using PIN `1234`.
+2. **Launch Local Web Server:**
+   - Double-click `run_app.bat` in the repository root (or run `python server.py`).
+   - The browser opens automatically to `http://127.0.0.1:8085`.
+3. **Connect to Telemetry:**
+   - Verify the baud rate selector is set to **9600**.
+   - Click **"Connect HC-05"** and select the paired Bluetooth Serial COM port.
+4. **Operation & Verification:**
+   - **Knock Mode:** Knock a 3-beat rhythm on the door. The LCD displays `Knock: [*  ]` &rarr; `[** ]` &rarr; `[***] OK`. The servo unlocks and relocks after 5 seconds.
+   - **Dynamic Calibration:** Rotate the potentiometer; verify the threshold gauge updates live on the web interface.
+   - **PIN Mode Override:** Press the PA1 push button to toggle off knock mode, then send `9999` from the keypad to unlock.
+
+---
+
+## 9. Testing Plan
 - **Correct Pattern:** 20 consecutive attempts using the stored rhythm; door should unlock on each attempt.
 - **Wrong Pattern:** 20 attempts with irregular rhythms; door must remain locked.
 - **Sensitivity:** Test soft, medium, and hard knocks across different potentiometer settings.
@@ -135,11 +193,11 @@ Open `http://127.0.0.1:8085` in Google Chrome or Microsoft Edge.
 
 ---
 
-## 9. Limitations & Future Work
+## 10. Limitations & Future Work
 - **Limitations:** Knock rhythms can be overheard; secret pattern is stored in firmware; HC-05 uses unencrypted SPP.
 - **Future Work:** Allow user-programmable rhythm storage in flash memory, add lockout after repeated failed attempts, upgrade to encrypted BLE, and use ADXL345 interrupt lines for low-power sleep modes.
 
 ---
 
-## 10. Acknowledgement
+## 11. Acknowledgement
 We express our sincere gratitude to our mentor, **Dr. A. Baskar**, for his valuable academic guidance and support throughout this case study carried out under the course **23CSE304 – Embedded Systems**, Department of Computer Science and Engineering, School of Computing, Amrita Vishwa Vidyapeetham, Coimbatore, India.
