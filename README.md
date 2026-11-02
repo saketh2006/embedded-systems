@@ -294,3 +294,4 @@ embedded-systems/
    ```
 3. Open `http://127.0.0.1:8085` in Google Chrome or Microsoft Edge (requires Web Serial API support).
 4. Click **"Connect HC-05"** and select the paired Bluetooth Serial COM port at **9600 Baud**.
+
