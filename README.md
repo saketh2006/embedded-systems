@@ -95,17 +95,28 @@ flowchart TD
 
 ---
 
-## 6. Project Files and Documentation
+## 6. Project Directory Structure
 
-All circuit schematics, prototype photos, presentations, and documents are organized inside the repository:
-
-- **Circuit Diagram:** `docs/images/circuit_diagram.png`
-- **Prototype Photos:** `docs/images/prototype_wooden_model.png`, `docs/images/prototype_exterior.jpg`, `docs/images/prototype_interior.jpg`
-- **Architecture Diagram:** `docs/images/prototype_overview_diagram.png`
-- **Case Study Report:** `docs/STM32_Knock_Pattern_Case_Study_Report.docx`
-- **Presentation Deck:** `docs/GROUP_9_Knock_Pattern_Smart_Door_Lock.pptx`
-- **Firmware Source:** `main.c` and `src/main.c`
-- **Web App Dashboard:** `web_app/` (`index.html`, `server.py`, `run_app.bat`)
+```text
+embedded-systems/
+├── docs/                                              # Case study documentation & visual assets
+│   ├── images/
+│   │   ├── circuit_diagram.png                        # Complete hardware circuit schematic
+│   │   ├── prototype_wooden_model.png                 # Labelled prototype demo door photo
+│   │   ├── prototype_overview_diagram.png             # Architecture, block diagram & latch states
+│   │   ├── prototype_exterior.jpg                     # Enclosure exterior with 16x2 LCD
+│   │   └── prototype_interior.jpg                     # Microcontroller & sensor breadboard wiring
+│   ├── GROUP_9_Knock_Pattern_Smart_Door_Lock.pptx     # Academic presentation deck
+│   └── STM32_Knock_Pattern_Case_Study_Report.docx     # Formal academic case study report
+├── src/                                               # Microcontroller Firmware
+│   └── main.c                                         # STM32F401CCU6 bare-metal CMSIS firmware
+├── web_app/                                           # HC-05 Telemetry & Control Dashboard
+│   ├── index.html                                     # Web Serial user interface
+│   ├── server.py                                      # Local Python HTTP server
+│   └── run_app.bat                                    # One-click launcher script
+├── .gitignore                                         # Git ignore configuration
+└── README.md                                          # Project documentation and guide
+```
 
 ---
 
@@ -118,8 +129,9 @@ An interactive web dashboard connects to the HC-05 Bluetooth module over Web Ser
 
 To launch:
 ```bash
+cd web_app
 python server.py
-# Or run run_app.bat
+# Or double-click web_app/run_app.bat
 ```
 Open `http://127.0.0.1:8085` in Google Chrome or Microsoft Edge.
 
@@ -149,7 +161,7 @@ Open `http://127.0.0.1:8085` in Google Chrome or Microsoft Edge.
 2. In the **Manage Run-Time Environment** dialog, check:
    - `CMSIS` &rarr; `CORE`
    - `Device` &rarr; `Startup`
-3. Add `main.c` (or `src/main.c`) into your project source group.
+3. Add `src/main.c` into your project source group.
 4. Open **Project Options (Alt + F7)**:
    - **Target Tab:** Set IROM1 to `0x08000000` (Size: `0x40000`), IRAM1 to `0x20000000` (Size: `0x10000`).
    - **Debug Tab:** Choose **ST-Link Debugger**, open *Settings*, and confirm SWD detects the Cortex-M4 core.
@@ -160,7 +172,7 @@ Open `http://127.0.0.1:8085` in Google Chrome or Microsoft Edge.
 
 #### Option B: Using STM32CubeIDE
 1. Create a new **STM32 Project** selecting MCU **STM32F401CCU6**.
-2. Copy `main.c` into the `Core/Src/` folder.
+2. Copy `src/main.c` into the `Core/Src/` folder.
 3. Build the project (**Project &rarr; Build Project**).
 4. Connect ST-LINK V2 and click **Run &rarr; Run As &rarr; STM32 Cortex-M C/C++ Application**.
 
@@ -171,7 +183,7 @@ Open `http://127.0.0.1:8085` in Google Chrome or Microsoft Edge.
    - In Windows, go to **Settings &rarr; Bluetooth & devices &rarr; Add device**.
    - Select **HC-05** and pair using PIN `1234`.
 2. **Launch Local Web Server:**
-   - Double-click `run_app.bat` in the repository root (or run `python server.py`).
+   - Double-click `run_app.bat` inside the `web_app/` folder (or open terminal, run `cd web_app && python server.py`).
    - The browser opens automatically to `http://127.0.0.1:8085`.
 3. **Connect to Telemetry:**
    - Verify the baud rate selector is set to **9600**.
