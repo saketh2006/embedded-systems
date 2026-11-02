@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.env
+.venv/
+env/
+venv/
+
+# Build artifacts
+*.o
+*.obj
+*.elf
+*.bin
+*.hex
+*.axf
+*.map
+build/
+Debug/
+Release/
+
+# OS and IDE files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.bak

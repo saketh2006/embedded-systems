@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>STM32 Smart Door Lock - HC-05 Control Center</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+    
+    :root {
+      --font-sans: 'Plus Jakarta Sans', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+    body {
+      font-family: var(--font-sans);
+      background-color: #070b16;
+      color: #e2e8f0;
+    }
+    .font-mono {
+      font-family: var(--font-mono);
+    }
+    .glass-card {
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.5);
+    }
+    .glass-card:hover {
+      border-color: rgba(255, 255, 255, 0.15);
+    }
+    .glow-cyan {
+      box-shadow: 0 0 25px -3px rgba(6, 182, 212, 0.35);
+    }
+    .glow-rose {
+      box-shadow: 0 0 25px -3px rgba(244, 63, 94, 0.35);
+    }
+    .glow-emerald {
+      box-shadow: 0 0 25px -3px rgba(16, 185, 129, 0.35);
+    }
+    .knock-dot {
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.6);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(71, 85, 105, 0.6);
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(100, 116, 139, 0.8);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col antialiased selection:bg-cyan-500 selection:text-black">
+
+  <!-- TOP HEADER & REAL HC-05 STATUS -->
+  <header class="border-b border-slate-800/80 bg-slate-900/90 backdrop-blur-md sticky top-0 z-50 px-4 lg:px-8 py-3.5">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center space-x-3.5">
+        <div class="h-10 w-10 rounded-xl bg-gradient-to-tr from-cyan-600 to-blue-500 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+          </svg>
+        </div>
+        <div>
+          <div class="flex items-center space-x-2">
+            <h1 class="text-lg font-bold text-white tracking-tight">STM32 Smart Door Lock</h1>
+            <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-800/60 font-semibold">HC-05 Direct Connect</span>
+          </div>
+          <p class="text-xs text-slate-400">STM32F401CCU6 • Live Potentiometer ADC • ADXL345 • SG90</p>
+        </div>
+      </div>
+
+      <!-- CONNECTION BAR -->
+      <div class="flex items-center space-x-3">
+        <!-- Live Connection Status Badge -->
+        <div id="statusBadge" class="flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-slate-800/90 border border-slate-700/60 text-xs font-medium text-slate-300">
+          <span id="statusLed" class="h-2.5 w-2.5 rounded-full bg-rose-500 animate-pulse"></span>
+          <span id="statusText">HC-05 Disconnected</span>
+        </div>
+
+        <!-- Baud Selector -->
+        <div class="flex items-center space-x-1.5 bg-slate-800/80 border border-slate-700 rounded-lg px-2.5 py-1">
+          <span class="text-[11px] text-slate-400 font-mono">Baud:</span>
+          <select id="baudSelect" class="bg-transparent text-xs text-cyan-300 font-mono focus:outline-none cursor-pointer">
+            <option value="9600" selected>9600 (HC-05 Default)</option>
+            <option value="115200">115200</option>
+            <option value="38400">38400</option>
+          </select>
+        </div>
+
+        <!-- Main Connect / Disconnect Button -->
+        <button id="btnConnect" onclick="toggleConnect()" class="flex items-center space-x-2 px-5 py-2 rounded-lg bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-semibold shadow-lg shadow-cyan-600/30 transition-all duration-200 active:scale-95">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+          </svg>
+          <span id="btnConnectText">Connect HC-05</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- NOTIFICATION / AVAILABLE DEVICES BAR -->
+  <div id="deviceNotice" class="bg-cyan-950/60 border-b border-cyan-800/40 px-4 py-2 text-center text-xs text-cyan-300 flex items-center justify-center space-x-2">
+    <span class="inline-block h-2 w-2 rounded-full bg-cyan-400 animate-ping"></span>
+    <span id="deviceNoticeText">Ready for HC-05 connection. Power on your module and select its COM port.</span>
+  </div>
+
+  <!-- MAIN DASHBOARD CONTENT -->
+  <main class="max-w-7xl mx-auto px-4 lg:px-8 py-6 w-full flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+    <!-- LEFT COLUMN: LOCK HERO & KEYPAD (5 COLS) -->
+    <div class="lg:col-span-5 flex flex-col space-y-6">
+
+      <!-- DOOR LOCK HERO CARD -->
+      <div id="doorCard" class="glass-card rounded-2xl p-6 transition-all duration-500 relative overflow-hidden glow-rose">
+        <div class="absolute -right-8 -top-8 w-40 h-40 bg-rose-500/10 rounded-full blur-2xl pointer-events-none" id="doorGlow"></div>
+
+        <div class="flex items-center justify-between mb-4">
+          <span class="text-xs uppercase tracking-wider font-semibold text-slate-400">Lock Mechanism State</span>
+          <span id="autoLockTimer" class="text-xs font-mono px-2.5 py-0.5 rounded bg-slate-800 text-slate-300 hidden">Auto-lock: <span id="countdownVal" class="text-cyan-400 font-bold">5s</span></span>
+        </div>
+
+        <div class="flex flex-col items-center justify-center py-6 text-center">
+          <!-- Big Lock SVG Animation -->
+          <div id="lockIconContainer" class="relative w-28 h-28 rounded-full bg-slate-900/90 border-2 border-rose-500/40 flex items-center justify-center mb-4 transition-all duration-500 shadow-xl">
+            <svg id="lockSvg" class="w-14 h-14 text-rose-500 transition-all duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+            </svg>
+          </div>
+
+          <div id="lockStateText" class="text-2xl font-extrabold text-rose-400 tracking-tight">DOOR LOCKED</div>
+          <p id="lockSubText" class="text-xs text-slate-400 mt-1">Servo: 2000µs (Locked position)</p>
+
+          <!-- Knock Mode vs BT Mode Pill -->
+          <div class="mt-4 flex items-center space-x-2">
+            <span class="text-xs text-slate-400">System Mode:</span>
+            <span id="modePill" class="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/30">
+              Knock Detection ON
+            </span>
+          </div>
+        </div>
+
+        <!-- QUICK ACTION BUTTONS -->
+        <div class="grid grid-cols-3 gap-2.5 pt-4 border-t border-slate-800">
+          <button onclick="sendQuickUnlock()" class="flex flex-col items-center justify-center p-3 rounded-xl bg-emerald-600/15 hover:bg-emerald-600/25 border border-emerald-500/30 text-emerald-400 transition-all active:scale-95">
+            <svg class="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2z"/>
+            </svg>
+            <span class="text-[11px] font-semibold">Send PIN 9999</span>
+          </button>
+
+          <button onclick="sendLockCommand()" class="flex flex-col items-center justify-center p-3 rounded-xl bg-rose-600/15 hover:bg-rose-600/25 border border-rose-500/30 text-rose-400 transition-all active:scale-95">
+            <svg class="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+            </svg>
+            <span class="text-[11px] font-semibold">Force Lock</span>
+          </button>
+
+          <button onclick="toggleSystemMode()" class="flex flex-col items-center justify-center p-3 rounded-xl bg-cyan-600/15 hover:bg-cyan-600/25 border border-cyan-500/30 text-cyan-400 transition-all active:scale-95">
+            <svg class="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+            <span class="text-[11px] font-semibold">Toggle Mode</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- INTERACTIVE BLUETOOTH PIN PAD -->
+      <div class="glass-card rounded-2xl p-6">
+        <div class="flex items-center justify-between mb-3">
+          <span class="text-xs uppercase tracking-wider font-semibold text-slate-400">Bluetooth Keypad</span>
+          <span class="text-[11px] text-slate-500 font-mono">STM32 PIN: 9999</span>
+        </div>
+
+        <!-- PIN Display Box -->
+        <div class="relative bg-slate-950/70 border border-slate-800 rounded-xl px-4 py-3 mb-4 flex items-center justify-between">
+          <div id="pinDisplay" class="font-mono text-2xl font-bold tracking-widest text-slate-600">••••</div>
+          <button onclick="clearPin()" class="text-xs text-slate-500 hover:text-slate-300 font-medium px-2 py-1 rounded bg-slate-800/60">
+            Clear
+          </button>
+        </div>
+
+        <!-- 3x4 Numpad Grid -->
+        <div class="grid grid-cols-3 gap-2 font-mono">
+          <button onclick="appendPin('1')" class="py-3 rounded-xl bg-slate-800/70 hover:bg-slate-700/80 active:bg-cyan-600 text-lg font-bold text-white transition-all">1</button>
+          <button onclick="appendPin('2')" class="py-3 rounded-xl bg-slate-800/70 hover:bg-slate-700/80 active:bg-cyan-600 text-lg font-bold text-white transition-all">2</button>
+          <button onclick="appendPin('3')" class="py-3 rounded-xl bg-slate-800/70 hover:bg-slate-700/80 active:bg-cyan-600 text-lg font-bold text-white transition-all">3</button>
+          
+          <button onclick="appendPin('4')" class="py-3 rounded-xl bg-slate-800/70 hover:bg-slate-700/80 active:bg-cyan-600 text-lg font-bold text-white transition-all">4</button>
+          <button onclick="appendPin('5')" class="py-3 rounded-xl bg-slate-800/70 hover:bg-slate-700/80 active:bg-cyan-600 text-lg font-bold text-white transition-all">5</button>
+          <button onclick="appendPin('6')" class="py-3 rounded-xl bg-slate-800/70 hover:bg-slate-700/80 active:bg-cyan-600 text-lg font-bold text-white transition-all">6</button>
+          
+          <button onclick="appendPin('7')" class="py-3 rounded-xl bg-slate-800/70 hover:bg-slate-700/80 active:bg-cyan-600 text-lg font-bold text-white transition-all">7</button>
+          <button onclick="appendPin('8')" class="py-3 rounded-xl bg-slate-800/70 hover:bg-slate-700/80 active:bg-cyan-600 text-lg font-bold text-white transition-all">8</button>
+          <button onclick="appendPin('9')" class="py-3 rounded-xl bg-slate-800/70 hover:bg-slate-700/80 active:bg-cyan-600 text-lg font-bold text-white transition-all">9</button>
+          
+          <button onclick="clearPin()" class="py-3 rounded-xl bg-slate-800/40 hover:bg-rose-950/60 text-rose-400 font-bold transition-all text-sm">CLR</button>
+          <button onclick="appendPin('0')" class="py-3 rounded-xl bg-slate-800/70 hover:bg-slate-700/80 active:bg-cyan-600 text-lg font-bold text-white transition-all">0</button>
+          <button onclick="submitPin()" class="py-3 rounded-xl bg-gradient-to-tr from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold transition-all shadow-md shadow-cyan-600/30 text-sm">SEND</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT COLUMN: SENSOR TELEMETRY & KNOCK MONITOR (7 COLS) -->
+    <div class="lg:col-span-7 flex flex-col space-y-6">
+
+      <!-- REAL-TIME ADC & POTENTIOMETER CARD -->
+      <div class="glass-card rounded-2xl p-6">
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center space-x-2">
+            <div id="adcPulse" class="h-2.5 w-2.5 rounded-full bg-slate-600"></div>
+            <h2 class="text-sm font-bold text-white tracking-wide uppercase">Potentiometer ADC & Knock Threshold</h2>
+          </div>
+          <span class="text-xs font-mono text-cyan-400 px-2 py-0.5 rounded bg-cyan-950/80 border border-cyan-800/50">ADC1_IN0 (PA0)</span>
+        </div>
+
+        <!-- Big Metric Cards -->
+        <div class="grid grid-cols-3 gap-3 mb-4">
+          <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-3">
+            <span class="text-[11px] text-slate-400 block font-medium">ADC Raw (12-bit)</span>
+            <span id="adcRawVal" class="text-2xl font-extrabold font-mono text-cyan-400">--</span>
+            <span class="text-[10px] text-slate-500">Range: 0 - 4095</span>
+          </div>
+
+          <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-3">
+            <span class="text-[11px] text-slate-400 block font-medium">Pot Voltage</span>
+            <span id="adcVoltVal" class="text-2xl font-extrabold font-mono text-white">-- V</span>
+            <span class="text-[10px] text-slate-500">Ref: 3.3V Analog</span>
+          </div>
+
+          <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-3">
+            <span class="text-[11px] text-slate-400 block font-medium">Knock Threshold</span>
+            <span id="thresholdVal" class="text-2xl font-extrabold font-mono text-amber-400">--</span>
+            <span class="text-[10px] text-slate-500">Formula: 20 + ADC*180/4095</span>
+          </div>
+        </div>
+
+        <!-- Visual Sensitivity Progress Bar -->
+        <div class="space-y-1.5 mb-4">
+          <div class="flex justify-between text-xs text-slate-400 font-mono">
+            <span>Max Sensitivity (20)</span>
+            <span id="adcPercent" class="text-cyan-400 font-semibold">--%</span>
+            <span>Min Sensitivity (200)</span>
+          </div>
+          <div class="w-full bg-slate-950 rounded-full h-3.5 p-0.5 border border-slate-800 overflow-hidden">
+            <div id="adcProgressBar" class="h-full rounded-full bg-gradient-to-r from-cyan-500 to-blue-500 transition-all duration-200" style="width: 0%;"></div>
+          </div>
+        </div>
+
+        <!-- Real-Time Scrolling Line Chart -->
+        <div class="h-44 w-full relative">
+          <canvas id="adcChart"></canvas>
+        </div>
+      </div>
+
+      <!-- KNOCK PATTERN DETECTOR CARD -->
+      <div class="glass-card rounded-2xl p-6">
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center space-x-2">
+            <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+            </svg>
+            <h2 class="text-sm font-bold text-white tracking-wide uppercase">ADXL345 Knock Pattern Sequence</h2>
+          </div>
+          <span id="knockStatusBadge" class="text-xs font-mono text-slate-400 px-2.5 py-0.5 rounded-full bg-slate-800">
+            Awaiting Knock 1
+          </span>
+        </div>
+
+        <!-- Knock 3-Step Visualizer -->
+        <div class="grid grid-cols-3 gap-3">
+          <!-- Knock 1 -->
+          <div id="knockStep1" class="knock-dot bg-slate-900/80 border border-slate-800 rounded-xl p-4 flex flex-col items-center justify-center text-center">
+            <div id="knockDot1" class="h-8 w-8 rounded-full bg-slate-800 border-2 border-slate-700 flex items-center justify-center text-xs font-bold text-slate-400 mb-2">1</div>
+            <span class="text-xs font-semibold text-slate-300">First Tap</span>
+            <span id="knockTime1" class="text-[10px] text-slate-500 font-mono mt-0.5">-- ms</span>
+          </div>
+
+          <!-- Knock 2 -->
+          <div id="knockStep2" class="knock-dot bg-slate-900/80 border border-slate-800 rounded-xl p-4 flex flex-col items-center justify-center text-center">
+            <div id="knockDot2" class="h-8 w-8 rounded-full bg-slate-800 border-2 border-slate-700 flex items-center justify-center text-xs font-bold text-slate-400 mb-2">2</div>
+            <span class="text-xs font-semibold text-slate-300">Second Tap</span>
+            <span id="knockTime2" class="text-[10px] text-slate-500 font-mono mt-0.5">-- ms</span>
+          </div>
+
+          <!-- Knock 3 (Unlock) -->
+          <div id="knockStep3" class="knock-dot bg-slate-900/80 border border-slate-800 rounded-xl p-4 flex flex-col items-center justify-center text-center">
+            <div id="knockDot3" class="h-8 w-8 rounded-full bg-slate-800 border-2 border-slate-700 flex items-center justify-center text-xs font-bold text-slate-400 mb-2">3</div>
+            <span class="text-xs font-semibold text-slate-300">Third Tap (Match)</span>
+            <span id="knockTime3" class="text-[10px] text-slate-500 font-mono mt-0.5">-- ms</span>
+          </div>
+        </div>
+
+        <div class="mt-4 flex items-center justify-between text-[11px] text-slate-400 bg-slate-950/60 px-3.5 py-2 rounded-lg border border-slate-800">
+          <span>Tolerance: <strong>±35% Interval</strong></span>
+          <span>Window: <strong>150ms - 1000ms</strong></span>
+          <span>Timeout: <strong>1500ms</strong></span>
+        </div>
+      </div>
+
+      <!-- LIVE SERIAL MONITOR TERMINAL -->
+      <div class="glass-card rounded-2xl p-4 flex flex-col flex-1">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-800/80 mb-2">
+          <div class="flex items-center space-x-2">
+            <div class="flex space-x-1.5">
+              <span class="h-2.5 w-2.5 rounded-full bg-rose-500/80"></span>
+              <span class="h-2.5 w-2.5 rounded-full bg-amber-500/80"></span>
+              <span class="h-2.5 w-2.5 rounded-full bg-emerald-500/80"></span>
+            </div>
+            <span class="text-xs font-mono text-slate-400 font-semibold pl-2">HC-05 Live Serial Stream</span>
+          </div>
+          <div class="flex items-center space-x-2">
+            <button onclick="clearTerminal()" class="text-[11px] text-slate-400 hover:text-white px-2 py-0.5 rounded bg-slate-800/80 hover:bg-slate-700 transition">Clear</button>
+            <label class="flex items-center space-x-1 text-[11px] text-slate-400 cursor-pointer">
+              <input type="checkbox" id="autoScrollCheck" checked class="rounded bg-slate-800 border-slate-700 text-cyan-500 focus:ring-0">
+              <span>Autoscroll</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Terminal Output Window -->
+        <div id="terminal" class="bg-black/75 rounded-xl p-3 font-mono text-xs text-emerald-400 h-36 overflow-y-auto space-y-1 select-text border border-slate-900">
+          <div class="text-slate-500">// Waiting for HC-05 serial connection...</div>
+        </div>
+
+        <!-- Custom Command Input -->
+        <form onsubmit="handleSendCustom(event)" class="mt-2.5 flex space-x-2">
+          <input type="text" id="customInput" placeholder="Send manual command to STM32 (e.g. 9999, LOCK, MODE)..." class="flex-1 bg-slate-950/80 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-500 font-mono focus:outline-none focus:ring-1 focus:ring-cyan-500">
+          <button type="submit" class="px-4 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200 transition">Send</button>
+        </form>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- ACADEMIC CASE STUDY DETAILS & ACKNOWLEDGEMENT -->
+  <footer class="border-t border-slate-800/80 bg-slate-900/60 backdrop-blur-md px-4 lg:px-8 py-5 mt-6 text-xs text-slate-400">
+    <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+      <div class="space-y-1 text-center md:text-left">
+        <div class="text-slate-200 font-semibold">23CSE304 – Embedded Systems Case Study: STM32 Knock Pattern Smart Door Lock</div>
+        <div>Department of Computer Science and Engineering &bull; School of Computing, Amrita Vishwa Vidyapeetham, Coimbatore</div>
+        <div class="text-cyan-400 font-medium">Academic Guidance &amp; Mentor: Dr. A. Baskar</div>
+      </div>
+      <div class="text-center md:text-right space-y-1">
+        <div class="text-slate-300 font-medium">Team Members:</div>
+        <div class="text-slate-400 text-[11px] font-mono">
+          V. Saketh (CB.SC.U4CSE24558) &bull; Y. Jothi Basu (CB.SC.U4CSE24559)<br>
+          T. Rohit Reddy (CB.SC.U4CSE24551) &bull; T. Kumar (CB.SC.U4CSE24552) &bull; Vageesh Raj V S (CB.SC.U4CSE24554)
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- WEB AUDIO SYNTHESIZER -->
+  <script>
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    
+    function playBeep(freq = 600, duration = 0.08, type = 'sine') {
+      try {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      } catch(e) {}
+    }
+
+    function playUnlockSound() {
+      playBeep(523.25, 0.1, 'triangle');
+      setTimeout(() => playBeep(659.25, 0.1, 'triangle'), 100);
+      setTimeout(() => playBeep(783.99, 0.18, 'triangle'), 200);
+    }
+
+    function playLockSound() {
+      playBeep(783.99, 0.1, 'sine');
+      setTimeout(() => playBeep(523.25, 0.18, 'sine'), 120);
+    }
+
+    function playErrorSound() {
+      playBeep(220, 0.2, 'sawtooth');
+      setTimeout(() => playBeep(180, 0.25, 'sawtooth'), 150);
+    }
+
+    function playKnockSound() {
+      playBeep(320, 0.05, 'triangle');
+    }
+  </script>
+
+  <!-- WEB SERIAL REAL-TIME CONNECTION -->
+  <script>
+    let serialPort = null;
+    let serialReader = null;
+    let serialWriter = null;
+    let inputBuffer = "";
+    let isConnected = false;
+    let currentPin = "";
+    let doorUnlocked = false;
+    let knockMode = true;
+    let autoLockInterval = null;
+    let autoLockSeconds = 5;
+
+    // Real-Time ADC Chart
+    const chartCtx = document.getElementById('adcChart').getContext('2d');
+    const MAX_DATA_POINTS = 35;
+    const adcChart = new Chart(chartCtx, {
+      type: 'line',
+      data: {
+        labels: Array(MAX_DATA_POINTS).fill(''),
+        datasets: [
+          {
+            label: 'Potentiometer ADC1 (PA0)',
+            data: Array(MAX_DATA_POINTS).fill(null),
+            borderColor: '#06b6d4',
+            backgroundColor: 'rgba(6, 182, 212, 0.12)',
+            borderWidth: 2,
+            tension: 0.25,
+            fill: true,
+            pointRadius: 0
+          },
+          {
+            label: 'Threshold x20',
+            data: Array(MAX_DATA_POINTS).fill(null),
+            borderColor: '#f59e0b',
+            borderWidth: 1.5,
+            borderDash: [4, 4],
+            pointRadius: 0,
+            fill: false
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: true,
+            labels: { color: '#94a3b8', font: { family: 'JetBrains Mono', size: 10 } }
+          }
+        },
+        scales: {
+          x: { display: false },
+          y: {
+            min: 0,
+            max: 4095,
+            grid: { color: 'rgba(51, 65, 85, 0.25)' },
+            ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: 9 }, stepSize: 1000 }
+          }
+        },
+        animation: { duration: 0 }
+      }
+    });
+
+    async function toggleConnect() {
+      if (isConnected) {
+        await disconnectSerial();
+        return;
+      }
+      try {
+        const baudRate = parseInt(document.getElementById('baudSelect').value, 10);
+        logTerminal("Opening Bluetooth COM port selector...", "info");
+        const port = await navigator.serial.requestPort();
+        await connectToPort(port);
+      } catch (err) {
+        if (err.name !== 'NotFoundError') {
+          logTerminal(`Connection failed: ${err.message}`, "error");
+        }
+      }
+    }
+
+    async function connectToPort(port) {
+      const baudRate = parseInt(document.getElementById('baudSelect').value, 10);
+      try {
+        serialPort = port;
+        await serialPort.open({ baudRate: baudRate });
+        serialWriter = serialPort.writable.getWriter();
+        isConnected = true;
+        updateConnectionUI(true, `Connected (${baudRate} Baud)`);
+        document.getElementById('deviceNoticeText').innerText = `HC-05 Connected on serial port at ${baudRate} baud. Streaming live values...`;
+        logTerminal(`Connected to serial port successfully at ${baudRate} baud.`, "success");
+        playBeep(880, 0.1);
+
+        readSerialLoop();
+      } catch (err) {
+        console.error(err);
+        logTerminal(`Port open error: ${err.message}`, "error");
+        updateConnectionUI(false, "Connection Failed");
+      }
+    }
+
+    async function disconnectSerial() {
+      try {
+        if (serialReader) {
+          await serialReader.cancel();
+          serialReader.releaseLock();
+          serialReader = null;
+        }
+        if (serialWriter) {
+          serialWriter.releaseLock();
+          serialWriter = null;
+        }
+        if (serialPort) {
+          await serialPort.close();
+          serialPort = null;
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        isConnected = false;
+        updateConnectionUI(false, "HC-05 Disconnected");
+        document.getElementById('deviceNoticeText').innerText = "HC-05 disconnected. Waiting for connection...";
+        document.getElementById('adcPulse').className = "h-2.5 w-2.5 rounded-full bg-slate-600";
+      }
+    }
+
+    // Continuous Read Loop
+    async function readSerialLoop() {
+      const textDecoder = new TextDecoderStream();
+      serialPort.readable.pipeTo(textDecoder.writable);
+      serialReader = textDecoder.readable.getReader();
+
+      try {
+        while (true) {
+          const { value, done } = await serialReader.read();
+          if (done) break;
+          if (value) {
+            handleIncomingChunk(value);
+          }
+        }
+      } catch (error) {
+        if (isConnected) {
+          logTerminal(`Read error: ${error.message}`, "error");
+        }
+      } finally {
+        if (serialReader) {
+          serialReader.releaseLock();
+        }
+      }
+    }
+
+    function handleIncomingChunk(chunk) {
+      inputBuffer += chunk;
+      let lines = inputBuffer.split(/\r\n|\n/);
+      inputBuffer = lines.pop();
+
+      for (let line of lines) {
+        line = line.trim();
+        if (line.length > 0) {
+          processMessage(line);
+        }
+      }
+    }
+
+    function processMessage(msg) {
+      logTerminal(msg, "rx");
+
+      // 1. ADC Telemetry: [POT:1850,THR:101]
+      const adcMatch = msg.match(/(?:\[POT:|POT:|ADC:|\[ADC:)(\d+)(?:,THR:(\d+))?/i);
+      if (adcMatch) {
+        const rawVal = parseInt(adcMatch[1], 10);
+        let thr = adcMatch[2] ? parseInt(adcMatch[2], 10) : Math.round(20 + (rawVal * 180 / 4095));
+        updateADCTelemetry(rawVal, thr);
+      }
+
+      // 2. Door Status
+      if (msg.includes("DOOR UNLOCKED") || msg.includes("[DOOR:UNLOCKED]") || msg.includes("Correct password") || msg.includes("ACCESS GRANTED")) {
+        setDoorState(true);
+      } else if (msg.includes("DOOR LOCKED") || msg.includes("[DOOR:LOCKED]")) {
+        setDoorState(false);
+      }
+
+      // 3. System Mode
+      if (msg.includes("Knocking system ON") || msg.includes("Knock Mode: ON") || msg.includes("[MODE:KNOCK_ON]")) {
+        setKnockMode(true);
+      } else if (msg.includes("Knocking system OFF") || msg.includes("BT PIN Mode") || msg.includes("[MODE:BT_PIN]")) {
+        setKnockMode(false);
+      }
+
+      // 4. Knock Pattern Detection
+      if (msg.includes("Knock 1") || msg.includes("[KNOCK:1]")) {
+        triggerKnockStep(1);
+      } else if (msg.includes("Knock 2") || msg.includes("[KNOCK:2]")) {
+        triggerKnockStep(2);
+      } else if (msg.includes("Correct knock pattern") || msg.includes("[KNOCK:OK]")) {
+        triggerKnockStep(3);
+      } else if (msg.includes("Wrong password") || msg.includes("DENIED")) {
+        playErrorSound();
+      }
+    }
+
+    async function sendSerialCommand(cmd) {
+      if (!serialWriter) {
+        logTerminal("Error: HC-05 is not connected! Click 'Connect HC-05' first.", "error");
+        return;
+      }
+      try {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(cmd + "\r\n");
+        await serialWriter.write(data);
+        logTerminal(cmd, "tx");
+      } catch (err) {
+        logTerminal(`Send failed: ${err.message}`, "error");
+      }
+    }
+
+    function updateConnectionUI(connected, text) {
+      const led = document.getElementById('statusLed');
+      const badge = document.getElementById('statusBadge');
+      const statusText = document.getElementById('statusText');
+      const btnText = document.getElementById('btnConnectText');
+
+      if (connected) {
+        led.className = "h-2.5 w-2.5 rounded-full bg-emerald-400";
+        badge.className = "flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-emerald-950/60 border border-emerald-800 text-xs font-medium text-emerald-300";
+        statusText.innerText = text;
+        btnText.innerText = "Disconnect";
+      } else {
+        led.className = "h-2.5 w-2.5 rounded-full bg-rose-500 animate-pulse";
+        badge.className = "flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-slate-800/90 border border-slate-700/60 text-xs font-medium text-slate-300";
+        statusText.innerText = text;
+        btnText.innerText = "Connect HC-05";
+      }
+    }
+
+    function setDoorState(unlocked) {
+      doorUnlocked = unlocked;
+      const card = document.getElementById('doorCard');
+      const iconContainer = document.getElementById('lockIconContainer');
+      const svg = document.getElementById('lockSvg');
+      const stateText = document.getElementById('lockStateText');
+      const subText = document.getElementById('lockSubText');
+      const timerPill = document.getElementById('autoLockTimer');
+
+      if (unlocked) {
+        playUnlockSound();
+        card.className = "glass-card rounded-2xl p-6 transition-all duration-500 relative overflow-hidden glow-emerald";
+        iconContainer.className = "relative w-28 h-28 rounded-full bg-slate-900/90 border-2 border-emerald-500/50 flex items-center justify-center mb-4 transition-all duration-500 shadow-xl";
+        svg.className = "w-14 h-14 text-emerald-400 transition-all duration-300";
+        svg.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2z"/>';
+        stateText.innerText = "DOOR UNLOCKED";
+        stateText.className = "text-2xl font-extrabold text-emerald-400 tracking-tight";
+        subText.innerText = "Servo: 1000µs (Access Granted)";
+
+        startAutoLockCountdown(5);
+      } else {
+        playLockSound();
+        card.className = "glass-card rounded-2xl p-6 transition-all duration-500 relative overflow-hidden glow-rose";
+        iconContainer.className = "relative w-28 h-28 rounded-full bg-slate-900/90 border-2 border-rose-500/40 flex items-center justify-center mb-4 transition-all duration-500 shadow-xl";
+        svg.className = "w-14 h-14 text-rose-500 transition-all duration-300";
+        svg.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2zm10-10V7a4 4 0 00-8 0v4h8z"/>';
+        stateText.innerText = "DOOR LOCKED";
+        stateText.className = "text-2xl font-extrabold text-rose-400 tracking-tight";
+        subText.innerText = "Servo: 2000µs (Locked position)";
+
+        clearInterval(autoLockInterval);
+        timerPill.classList.add('hidden');
+      }
+    }
+
+    function startAutoLockCountdown(sec) {
+      clearInterval(autoLockInterval);
+      autoLockSeconds = sec;
+      const timerPill = document.getElementById('autoLockTimer');
+      const countdownVal = document.getElementById('countdownVal');
+      timerPill.classList.remove('hidden');
+      countdownVal.innerText = `${autoLockSeconds}s`;
+
+      autoLockInterval = setInterval(() => {
+        autoLockSeconds--;
+        if (autoLockSeconds <= 0) {
+          clearInterval(autoLockInterval);
+          timerPill.classList.add('hidden');
+        } else {
+          countdownVal.innerText = `${autoLockSeconds}s`;
+        }
+      }, 1000);
+    }
+
+    function setKnockMode(enabled) {
+      knockMode = enabled;
+      const pill = document.getElementById('modePill');
+      if (enabled) {
+        pill.innerText = "Knock Detection ON";
+        pill.className = "text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/30";
+      } else {
+        pill.innerText = "Bluetooth PIN Mode";
+        pill.className = "text-xs font-semibold px-2.5 py-1 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/30";
+      }
+    }
+
+    function triggerKnockStep(step) {
+      playKnockSound();
+      const dot1 = document.getElementById('knockDot1');
+      const dot2 = document.getElementById('knockDot2');
+      const dot3 = document.getElementById('knockDot3');
+      const badge = document.getElementById('knockStatusBadge');
+
+      if (step === 1) {
+        dot1.className = "h-8 w-8 rounded-full bg-amber-500 text-black border-2 border-amber-400 flex items-center justify-center text-xs font-bold shadow-lg shadow-amber-500/50 scale-110";
+        document.getElementById('knockTime1').innerText = "Detected";
+        badge.innerText = "Knock 1 Detected (Listening for 2...)";
+        badge.className = "text-xs font-mono text-amber-400 px-2.5 py-0.5 rounded-full bg-amber-950/80 border border-amber-800";
+      } else if (step === 2) {
+        dot2.className = "h-8 w-8 rounded-full bg-amber-500 text-black border-2 border-amber-400 flex items-center justify-center text-xs font-bold shadow-lg shadow-amber-500/50 scale-110";
+        document.getElementById('knockTime2').innerText = "Detected";
+        badge.innerText = "Knock 2 Detected (Listening for 3...)";
+      } else if (step === 3) {
+        dot3.className = "h-8 w-8 rounded-full bg-emerald-500 text-black border-2 border-emerald-400 flex items-center justify-center text-xs font-bold shadow-lg shadow-emerald-500/50 scale-110";
+        document.getElementById('knockTime3').innerText = "MATCH OK!";
+        badge.innerText = "Knock Pattern Verified! Unlocking...";
+        badge.className = "text-xs font-mono text-emerald-400 px-2.5 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-800";
+
+        setTimeout(resetKnockDots, 2500);
+      }
+    }
+
+    function resetKnockDots() {
+      for (let i = 1; i <= 3; i++) {
+        document.getElementById(`knockDot${i}`).className = "h-8 w-8 rounded-full bg-slate-800 border-2 border-slate-700 flex items-center justify-center text-xs font-bold text-slate-400 mb-2";
+        document.getElementById(`knockTime${i}`).innerText = "-- ms";
+      }
+      const badge = document.getElementById('knockStatusBadge');
+      badge.innerText = "Awaiting Knock 1";
+      badge.className = "text-xs font-mono text-slate-400 px-2.5 py-0.5 rounded-full bg-slate-800";
+    }
+
+    function updateADCTelemetry(raw, thr) {
+      document.getElementById('adcPulse').className = "h-2.5 w-2.5 rounded-full bg-cyan-400 animate-ping";
+      document.getElementById('adcRawVal').innerText = raw;
+      document.getElementById('thresholdVal').innerText = thr;
+      const volts = (raw * 3.3 / 4095).toFixed(2);
+      document.getElementById('adcVoltVal').innerText = `${volts} V`;
+
+      const pct = Math.round((raw / 4095) * 100);
+      document.getElementById('adcPercent').innerText = `${pct}%`;
+      document.getElementById('adcProgressBar').style.width = `${pct}%`;
+
+      const data = adcChart.data.datasets[0].data;
+      data.shift();
+      data.push(raw);
+
+      const thrData = adcChart.data.datasets[1].data;
+      thrData.shift();
+      thrData.push(thr * 20);
+
+      adcChart.update();
+    }
+
+    function appendPin(num) {
+      playBeep(450, 0.04);
+      if (currentPin.length < 8) {
+        currentPin += num;
+        renderPin();
+      }
+    }
+
+    function clearPin() {
+      playBeep(350, 0.05);
+      currentPin = "";
+      renderPin();
+    }
+
+    function renderPin() {
+      const display = document.getElementById('pinDisplay');
+      if (currentPin.length === 0) {
+        display.innerText = "••••";
+        display.className = "font-mono text-2xl font-bold tracking-widest text-slate-600";
+      } else {
+        display.innerText = "•".repeat(currentPin.length);
+        display.className = "font-mono text-2xl font-bold tracking-widest text-cyan-400";
+      }
+    }
+
+    function submitPin() {
+      if (currentPin.length === 0) return;
+      playBeep(700, 0.08);
+      sendSerialCommand(currentPin);
+      clearPin();
+    }
+
+    function sendQuickUnlock() { sendSerialCommand("9999"); }
+    function sendLockCommand() { sendSerialCommand("LOCK"); }
+    function toggleSystemMode() { sendSerialCommand("MODE"); }
+
+    function handleSendCustom(e) {
+      e.preventDefault();
+      const input = document.getElementById('customInput');
+      const val = input.value.trim();
+      if (val) {
+        sendSerialCommand(val);
+        input.value = "";
+      }
+    }
+
+    function logTerminal(text, type = "normal") {
+      const term = document.getElementById('terminal');
+      const time = new Date().toTimeString().split(' ')[0];
+      const div = document.createElement('div');
+      div.className = "leading-relaxed";
+
+      if (type === "rx") {
+        div.innerHTML = `<span class="text-slate-600">[${time}]</span> <span class="text-cyan-400">&lt;</span> <span class="text-slate-200">${escapeHtml(text)}</span>`;
+      } else if (type === "tx") {
+        div.innerHTML = `<span class="text-slate-600">[${time}]</span> <span class="text-amber-400">&gt; SEND:</span> <span class="text-amber-300 font-bold">${escapeHtml(text)}</span>`;
+      } else if (type === "error") {
+        div.innerHTML = `<span class="text-slate-600">[${time}]</span> <span class="text-rose-400">✖ ${escapeHtml(text)}</span>`;
+      } else if (type === "success") {
+        div.innerHTML = `<span class="text-slate-600">[${time}]</span> <span class="text-emerald-400">✔ ${escapeHtml(text)}</span>`;
+      } else {
+        div.innerHTML = `<span class="text-slate-600">[${time}]</span> <span class="text-slate-400">${escapeHtml(text)}</span>`;
+      }
+
+      term.appendChild(div);
+      if (document.getElementById('autoScrollCheck').checked) {
+        term.scrollTop = term.scrollHeight;
+      }
+    }
+
+    function clearTerminal() {
+      document.getElementById('terminal').innerHTML = '<div class="text-slate-500">// Terminal cleared.</div>';
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+  </script>
+</body>
+</html>
