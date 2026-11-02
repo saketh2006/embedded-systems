@@ -125,6 +125,11 @@ stateDiagram-v2
    - After $500\,\text{ms}$, PWM duty cycle is muted to eliminate servo idle heating and power supply sag.
    - After $5000\,\text{ms}$, system automatically relocks ($2000\,\mu\text{s}$) and resets state.
 
+### Subsystem Block Diagram & Latch Operation
+
+![Complete Prototype Overview & Architecture](docs/images/prototype_overview_diagram.png)
+*Figure 2: Complete prototype system overview showing block diagram, SG90 servo power wiring, step-by-step 90° latch actuation, and hardware component layout.*
+
 ---
 
 ## 5. Circuit Design & Schematic
@@ -161,12 +166,17 @@ The circuit design utilizes an isolated dual-rail architecture:
 
 ## 7. Prototype
 
-The physical prototype is constructed using an enclosed demonstration door assembly featuring real-time visual feedback and modular sensor placement:
+The physical prototype is constructed using an enclosed demonstration door assembly featuring real-time visual feedback, tactile knock sensing, and wireless telemetry:
 
-| Exterior Door Panel & Status Display | Interior Hardware & Wiring Enclosure |
+### Fully Integrated Demonstration Setup
+![Working Prototype with Labelled Electronics](docs/images/prototype_wooden_model.png)
+*Figure 3: Fully assembled working prototype featuring the demonstration door, ADXL345 vibration sensor, STM32 Black Pill, SG90 servo latch, 16×2 LCD, 5V 2A isolated power supply, and live smartphone Bluetooth status notifications.*
+
+### Prototype Construction Details
+| Enclosure Exterior & LCD Display | Interior Controller & Breadboard Routing |
 | :---: | :---: |
 | ![Prototype Exterior](docs/images/prototype_exterior.jpg) | ![Prototype Interior](docs/images/prototype_interior.jpg) |
-| *Figure 2: Exterior door model with 16×2 I²C LCD showing system status.* | *Figure 3: Interior circuitry showing STM32 Black Pill, HC-05, ADXL345, potentiometer, ST-LINK V2, and SG90 servo.* |
+| *Figure 4: Enclosed prototype exterior displaying real-time system status (`DOOR LOCKED`, `Knock Mode: ON`).* | *Figure 5: Interior wiring layout showing STM32 Black Pill, ST-LINK V2 programmer, HC-05, potentiometer, and servo wiring.* |
 
 ---
 
