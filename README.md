@@ -43,13 +43,38 @@ An STM32F401CCU6 microcontroller samples the ADXL345 accelerometer every 20 ms. 
 
 ---
 
-## 4. System Working
-1. **Power-On:** Hardware peripherals (SysTick, GPIO, I²C1, ADC1, USART2, TIM3 PWM) are initialized.
-2. **Knock Detection:** ADXL345 detects vibration spikes. The potentiometer sets the sensitivity threshold.
-3. **Pattern Validation:** The firmware measures inter-knock intervals $T_1$ and $T_2$.
-   - **Correct Pattern:** LCD shows `ACCESS GRANTED` / `DOOR UNLOCKED`, the servo moves to the open position (1000 µs), and an unlock notification is sent via Bluetooth. The door automatically relocks after 5 seconds.
-   - **Incorrect Pattern:** LCD shows `ACCESS DENIED` / `DOOR LOCKED`, the servo stays locked (2000 µs), and a rejection alert is sent via Bluetooth.
-4. **Bluetooth Override:** If knock mode is disabled via the push button, the door can also be unlocked by sending the PIN (`9999`) via Bluetooth.
+## 4. System Workflow & Working
+
+### Six-Step Workflow:
+1. **Step 1 — Power On & Initialization:** Firmware initializes SysTick timer (1 ms timebase), GPIOs, I²C1 bus, 12-bit ADC1, USART2 serial engine (9600 baud), and TIM3 PWM channel.
+2. **Step 2 — Motion & Vibration Sensing:** ADXL345 digital accelerometer transmits 3-axis acceleration data $(x, y, z)$ over I²C every 20 ms.
+3. **Step 3 — Sensitivity Thresholding:** 12-bit ADC samples the 10 kΩ potentiometer wiper (PA0) to adaptively adjust the vibration threshold against varying door densities.
+4. **Step 4 — Temporal Rhythm Recording:** SysTick captures precise timestamps on qualifying impact spikes; inter-knock intervals ($T_1, T_2$) are recorded and debounced (180 ms lockout).
+5. **Step 5 — Pattern Verification & Decision:** Firmware evaluates total knock count, interval boundaries (150 ms to 1000 ms), and relative cadence symmetry ($|T_1 - T_2| \le 35\% \times T_1$).
+6. **Step 6 — Actuation & State Reset:**
+   - **Pattern Match (Access Granted):** LCD shows `ACCESS GRANTED` / `DOOR UNLOCKED`, SG90 servo rotates to unlock position (1000 µs), HC-05 transmits unlock notification to phone. After 5 seconds (5000 ms), the latch automatically relocks.
+   - **Pattern Mismatch / Timeout (Access Denied):** LCD shows `ACCESS DENIED` / `DOOR LOCKED`, servo remains locked (2000 µs), HC-05 transmits rejection alert, and system resets to listening mode.
+   - **Manual Bluetooth Override:** When knock mode is toggled off via push button (PA1), entering the 4-digit PIN (`9999`) via Bluetooth unlocks the door directly.
+
+### Workflow Diagram:
+```mermaid
+flowchart TD
+    A([Power On]) --> B[Initialize SysTick, GPIO, I2C1, ADC1, USART2, TIM3]
+    B --> C[Sample Potentiometer via ADC1 PA0 -> Compute Threshold]
+    C --> D[Sample ADXL345 Acceleration over I2C1]
+    D --> E{Impact > Threshold?}
+    E -- No --> D
+    E -- Yes --> F[Record Knock Timestamps & Measure Intervals T1, T2]
+    F --> G{3 Knocks & Intervals in 150-1000ms?}
+    G -- No / Timeout --> H[Access Denied: LCD 'ACCESS DENIED', Door Stays Locked, BT Alert]
+    G -- Yes --> I{Timing Difference <= 35%?}
+    I -- No --> H
+    I -- Yes --> J[Access Granted: LCD 'ACCESS GRANTED', SG90 Servo Unlocks, BT Alert]
+    J --> K[Wait 5000ms Auto-Relock Timeout]
+    K --> L[Servo Relocks to 2000us]
+    H --> D
+    L --> D
+```
 
 ---
 
